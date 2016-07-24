@@ -1,5 +1,5 @@
 ﻿# -*- coding:utf-8 -*-
-
+import datetime,xlrd,pyExcelerator
 def convert2dic(f):
 	"""load the file and convert it into dic,key is query word,and the values are pv,style,click,cost"""
 	#定义字典，依次存储值为PV，样式，点击，消耗
@@ -320,3 +320,375 @@ def write_result(a,sheet,b,shunxu):
 		sheet.write(row,9,a[shunxu[key]][8])
 	
 	print "ALL is successfully done"
+
+def timeseries(startdate,enddate):
+	format = "%Y%m%d"
+	sd = datetime.datetime.strptime(startdate,format)
+	ed = datetime.datetime.strptime(enddate,format)
+	delta = ed-sd
+	ts = []
+	for i in range(delta.days+1):
+		ts.append(datetime.datetime.strftime(sd+datetime.timedelta(days = i),format))
+	return ts
+
+def loadandmerge(a,startdate,enddate):
+	AllData = {}
+	Stylekey = ''
+	AllStyle = [u"酒店",u"旅游",u"机票",u"酒店-单体品牌词",u"酒店-通用词",u"酒店-地域酒店",u"酒店-连锁品牌词",u"旅游-通用词",u"旅游-单线路",u"机票通用词",u"机票-交通出行聚合"]
+	data = xlrd.open_workbook(a)
+	table = data.sheets()[1]
+	for i in range(table.nrows):
+		line = table.row_values(i)[:12]
+		if line[0] in AllStyle:
+			Stylekey = line[0]
+			AllData[Stylekey]={}
+			continue
+		if line[0] ==u"总计" or line[0] == '':
+			continue
+		AllData[Stylekey][line[0]] = line[1:]
+	for k in timeseries(startdate,enddate):
+		oneday = loadoneday(k)
+		for key in oneday:
+			AllData[key][k] = oneday[key]
+			PV_exp_comp = float(AllData[key][k][0])/AllData[key][k][4]
+			Cost_exp_comp = float(AllData[key][k][2])/AllData[key][k][6]
+			AllData[key][k].append(PV_exp_comp)
+			AllData[key][k].append(Cost_exp_comp)
+	#读取所有数据，开始增加所有样式的分天总计项，不能带“机票”、"旅游"、“酒店”，否则重复
+	AllData[u"总计"] = {}
+	for k in timeseries("20160622",enddate):
+		ExpPV1=0
+		ExpClick1 =0
+		ExpCost1=0
+		ComPV1= 0
+		ComClick1= 0
+		ComCost1= 0
+		#print "print date",k
+		for key in [u"酒店-单体品牌词",u"酒店-通用词",u"酒店-地域酒店",u"酒店-连锁品牌词",u"旅游-通用词",u"旅游-单线路",u"机票通用词",u"机票-交通出行聚合"]:
+			if AllData[key].has_key(k):
+				#print "%s date has  %s"%(k,key)
+				ExpPV,ExpClick,ExpCost,ExpCTR,ComPV,ComClick,ComCost,ComCTR,CTR_change,PV_exp_comp,Cost_exp_comp = AllData[key][k]
+				ExpPV1 += ExpPV
+				ExpClick1 += ExpClick
+				ExpCost1 += ExpCost
+				ComPV1 += ComPV
+				ComClick1 += ComClick
+				ComCost1 += ComCost
+			else :
+				continue
+		if ExpPV1 == 0:
+			print "%r has no data"%k
+			continue
+		else:
+			ExpCTR1 = float(ExpClick1)/ExpPV1
+			ComCTR1 = float(ComClick1)/ComPV1
+			CTR_change1 = ExpCTR1/ComCTR1-1
+			PV_exp_comp1 = float(ExpPV1) / ComPV1
+			Cost_exp_comp1 = float(ExpCost1) / ComCost1
+		#print "%s data is"%k,ExpPV1,ExpClick1,ExpCost1,ExpCTR1,ComPV1,ComClick1,ComCost1,ComCTR1,CTR_change1,PV_exp_comp1,Cost_exp_comp1
+		AllData[u"总计"][k]=[ExpPV1,ExpClick1,ExpCost1,ExpCTR1,ComPV1,ComClick1,ComCost1,ComCTR1,CTR_change1,PV_exp_comp1,Cost_exp_comp1]
+	#增加分样式总计：
+	AllSumStyle = [u"酒店",u"旅游",u"机票",u"酒店-单体品牌词",u"酒店-通用词",u"酒店-地域酒店",u"酒店-连锁品牌词",u"旅游-通用词",u"旅游-单线路",u"机票通用词",u"机票-交通出行聚合",u"总计"]
+	for key in AllSumStyle:
+		ExpPV2=0
+		ExpClick2 =0
+		ExpCost2=0
+		ComPV2= 0
+		ComClick2= 0
+		ComCost2= 0
+		for k in timeseries("20160622",enddate):
+			if AllData[key].has_key(k):
+				ExpPV,ExpClick,ExpCost,ExpCTR,ComPV,ComClick,ComCost,ComCTR,CTR_change,PV_exp_comp,Cost_exp_comp = AllData[key][k]
+				ExpPV2 += ExpPV
+				ExpClick2 += ExpClick
+				ExpCost2 += ExpCost
+				ComPV2 += ComPV
+				ComClick2 += ComClick
+				ComCost2 += ComCost
+			else :
+				continue
+		if ExpPV2 == 0:
+			print "%r has no data"%k
+			continue
+		else:
+			ExpCTR2 = float(ExpClick2)/ExpPV2
+			ComCTR2 = float(ComClick2)/ComPV2
+			CTR_change2 = ExpCTR2/ComCTR2-1
+			PV_exp_comp2 = float(ExpPV2) / ComPV2
+			Cost_exp_comp2 = float(ExpCost2) / ComCost2
+		AllData[key][u"总计"]=[ExpPV2,ExpClick2,ExpCost2,ExpCTR2,ComPV2,ComClick2,ComCost2,ComCTR2,CTR_change2,PV_exp_comp2,Cost_exp_comp2]
+	return AllData
+	
+def loadoneday(date):
+	s = date+'.xls'
+	oneday_data = xlrd.open_workbook(s)
+	table = oneday_data.sheets()[3]
+	dic = {}
+	for j in range(table.nrows):
+		line = table.row_values(j)[:10]
+		if j == 0:
+			continue
+		if line[0] ==u"汇总":
+			continue
+		dic[line[0]] = line[1:]
+	return dic
+	
+
+def writeall(dic,startdate,enddate):
+	#AllStyle = [u"酒店",u"旅游",u"机票",u"酒店-单体品牌词",u"酒店-通用词",u"酒店-地域酒店",u"酒店-连锁品牌词",u"旅游-通用词",u"旅游-单线路",u"机票通用词",u"机票-交通出行聚合"]
+	workbook = pyExcelerator.Workbook()
+	sheet1 = workbook.add_sheet(u'结论')
+	sheet2 = workbook.add_sheet(u'最终结论表')
+	
+	writefirst(sheet1,dic,startdate,enddate)
+	writesecond(sheet2,dic,startdate,enddate)
+	
+	workbook.save("resulttest.xls")
+	
+	print "all is write into the EXCEL"
+	
+def writefirst(sheet,dic,startdate,enddate):
+	myfont = pyExcelerator.Font()
+	#myfont.name = u'Times New Roman'
+	myfont.bold = True
+	pattern1 = pyExcelerator.Pattern() 
+	pattern1.pattern = pyExcelerator.Pattern.SOLID_PATTERN 
+	pattern1.pattern_fore_colour = 5
+	pattern2 = pyExcelerator.Pattern() 
+	pattern2.pattern = pyExcelerator.Pattern.SOLID_PATTERN 
+	pattern2.pattern_fore_colour = 22
+	pattern3 = pyExcelerator.Pattern() 
+	pattern3.pattern = pyExcelerator.Pattern.SOLID_PATTERN 
+	pattern3.pattern_fore_colour = 44 
+	mystyle1 = pyExcelerator.XFStyle()
+	mystyle1.font = myfont
+	mystyle1.pattern = pattern1
+	#加粗标黄 
+	mystyle2 = pyExcelerator.XFStyle()
+	mystyle2.pattern = pattern1
+	#标黄
+	mystyle3 = pyExcelerator.XFStyle()
+	mystyle3.pattern = pattern2
+	#为空标灰
+	mystyle4 = pyExcelerator.XFStyle()
+	mystyle4.pattern = pattern3
+	mystyle4.font = myfont
+	#为蓝加粗
+	row = 0
+	for day in timeseries(startdate,enddate):
+		sheet.write(row,0,day)
+		firsttitle_write(sheet,row)
+		row += 1
+		for key in [u"酒店-单体品牌词",u"酒店-地域酒店",u"酒店-通用词",u"酒店-连锁品牌词",u"酒店",u"旅游-通用词",u"旅游-单线路",u"旅游",u"机票通用词",u"机票-交通出行聚合",u"机票",u"总计"]:
+			if dic[key].has_key(day):
+				if key == u"酒店" or key == u"旅游" or key == u"机票":
+					sheet.write(row,0,key,mystyle1)
+					ExpPV,ExpClick,ExpCost,ExpCTR,ComPV,ComClick,ComCost,ComCTR,CTR_change,PV_exp_comp,Cost_exp_comp = dic[key][day]
+					sheet.write(row,1,ExpPV,mystyle2)
+					sheet.write(row,2,ExpClick,mystyle2)
+					sheet.write(row,3,ExpCost,mystyle2)
+					sheet.write(row,4,ExpCTR,mystyle2)
+					sheet.write(row,5,ComPV,mystyle2)
+					sheet.write(row,6,ComClick,mystyle2)
+					sheet.write(row,7,ComCost,mystyle2)
+					sheet.write(row,8,ComCTR,mystyle2)
+					sheet.write(row,9,CTR_change,mystyle2)
+					sheet.write(row,10,PV_exp_comp,mystyle2)
+					sheet.write(row,11,Cost_exp_comp,mystyle2)
+				elif key == u"总计":
+					sheet.write(row,0,key,mystyle4)
+					ExpPV,ExpClick,ExpCost,ExpCTR,ComPV,ComClick,ComCost,ComCTR,CTR_change,PV_exp_comp,Cost_exp_comp = dic[key][day]
+					sheet.write(row,1,ExpPV,mystyle4)
+					sheet.write(row,2,ExpClick,mystyle4)
+					sheet.write(row,3,ExpCost,mystyle4)
+					sheet.write(row,4,ExpCTR,mystyle4)
+					sheet.write(row,5,ComPV,mystyle4)
+					sheet.write(row,6,ComClick,mystyle4)
+					sheet.write(row,7,ComCost,mystyle4)
+					sheet.write(row,8,ComCTR,mystyle4)
+					sheet.write(row,9,CTR_change,mystyle4)
+					sheet.write(row,10,PV_exp_comp,mystyle4)
+					sheet.write(row,11,Cost_exp_comp,mystyle4)
+				else:
+					sheet.write(row,0,key)
+					ExpPV,ExpClick,ExpCost,ExpCTR,ComPV,ComClick,ComCost,ComCTR,CTR_change,PV_exp_comp,Cost_exp_comp = dic[key][day]
+					sheet.write(row,1,ExpPV)
+					sheet.write(row,2,ExpClick)
+					sheet.write(row,3,ExpCost)
+					sheet.write(row,4,ExpCTR)
+					sheet.write(row,5,ComPV)
+					sheet.write(row,6,ComClick)
+					sheet.write(row,7,ComCost)
+					sheet.write(row,8,ComCTR)
+					sheet.write(row,9,CTR_change)
+					sheet.write(row,10,PV_exp_comp)
+					sheet.write(row,11,Cost_exp_comp)
+			else:
+				sheet.write(row,0,key,mystyle3)
+				sheet.write(row,1,'',mystyle3)
+				sheet.write(row,2,'',mystyle3)
+				sheet.write(row,3,'',mystyle3)
+				sheet.write(row,4,'',mystyle3)
+				sheet.write(row,5,'',mystyle3)
+				sheet.write(row,6,'',mystyle3)
+				sheet.write(row,7,'',mystyle3)
+				sheet.write(row,8,'',mystyle3)
+				sheet.write(row,9,'',mystyle3)
+				sheet.write(row,10,'',mystyle3)
+				sheet.write(row,11,'',mystyle3)
+			#else:
+				#print "%s don't have data of %s"%(key,day)
+#########################################################以下用来增加单天备注
+			if key == u"酒店-通用词" and day == "20160622":
+				sheet.write(row,12,u"当日badcase较多，抽取日PV大于10的query进行分析")
+			if key == u"旅游-单线路" and day == "20160623":
+				sheet.write(row,12,u"PV量较少数据不稳定，待观察")
+			row += 1
+	print "the first sheet is write"
+#定义表头函数		
+def firsttitle_write(sheet,row):
+	myfont = pyExcelerator.Font()
+	#myfont.name = u'Times New Roman'
+	myfont.bold = True
+	pattern = pyExcelerator.Pattern() 
+	pattern.pattern = pyExcelerator.Pattern.SOLID_PATTERN 
+	pattern.pattern_fore_colour = 52 
+	mystyle = pyExcelerator.XFStyle()
+	mystyle.font = myfont
+	mystyle.pattern = pattern
+	sheet.write(row,1,u'实验组总PV',mystyle)
+	sheet.write(row,2,u'实验组总点击',mystyle)
+	sheet.write(row,3,u'实验组总消耗',mystyle)
+	sheet.write(row,4,u'实验组CTR',mystyle)
+	sheet.write(row,5,u'对照组总PV',mystyle)
+	sheet.write(row,6,u'对照组总点击',mystyle)
+	sheet.write(row,7,u'对照组总消耗',mystyle)
+	sheet.write(row,8,u'对照组CTR',mystyle)
+	sheet.write(row,9,u'CTR变化',mystyle)
+	sheet.write(row,10,u'PV对比',mystyle)
+	sheet.write(row,11,u'消耗对比',mystyle)
+	sheet.write(row,12,u'备注',mystyle)
+
+def secondtitle_write(sheet,row):
+	myfont = pyExcelerator.Font()
+	#myfont.name = u'Times New Roman'
+	myfont.bold = True
+	pattern = pyExcelerator.Pattern() 
+	pattern.pattern = pyExcelerator.Pattern.SOLID_PATTERN 
+	pattern.pattern_fore_colour = 52 
+	mystyle = pyExcelerator.XFStyle()
+	mystyle.font = myfont
+	mystyle.pattern = pattern
+	sheet.write(row,1,u'实验组总PV',mystyle)
+	sheet.write(row,2,u'实验组总点击',mystyle)
+	sheet.write(row,3,u'实验组总消耗',mystyle)
+	sheet.write(row,4,u'实验组CTR',mystyle)
+	sheet.write(row,5,u'对照组总PV',mystyle)
+	sheet.write(row,6,u'对照组总点击',mystyle)
+	sheet.write(row,7,u'对照组总消耗',mystyle)
+	sheet.write(row,8,u'对照组CTR',mystyle)
+	sheet.write(row,9,u'CTR变化',mystyle)
+	sheet.write(row,10,u'PV对比',mystyle)
+	sheet.write(row,11,u'消耗对比',mystyle)
+
+def writesecond(sheet,dic,startdate,enddate):
+	myfont = pyExcelerator.Font()
+	#myfont.name = u'Times New Roman'
+	myfont.bold = True
+	pattern1 = pyExcelerator.Pattern() 
+	pattern1.pattern = pyExcelerator.Pattern.SOLID_PATTERN 
+	pattern1.pattern_fore_colour = 52 
+	mystyle1 = pyExcelerator.XFStyle()
+	mystyle1.font = myfont
+	mystyle1.pattern = pattern1
+	pattern2 = pyExcelerator.Pattern() 
+	pattern2.pattern = pyExcelerator.Pattern.SOLID_PATTERN 
+	pattern2.pattern_fore_colour = 44 
+	mystyle2 = pyExcelerator.XFStyle()
+	mystyle2.font = myfont
+	mystyle2.pattern = pattern2
+	row = 0
+	for key in [u"总计",u"酒店",u"旅游",u"机票",u"酒店-单体品牌词",u"酒店-通用词",u"酒店-地域酒店",u"酒店-连锁品牌词",u"旅游-通用词",u"旅游-单线路",u"机票通用词",u"机票-交通出行聚合"]:
+		sheet.write(row,0,key,mystyle1)
+		secondtitle_write(sheet,row)
+		row += 1
+		for day in timeseries(startdate,enddate):
+			if dic[key].has_key(day):
+				sheet.write(row,0,day)
+				ExpPV,ExpClick,ExpCost,ExpCTR,ComPV,ComClick,ComCost,ComCTR,CTR_change,PV_exp_comp,Cost_exp_comp = dic[key][day]
+				sheet.write(row,1,ExpPV)
+				sheet.write(row,2,ExpClick)
+				sheet.write(row,3,ExpCost)
+				sheet.write(row,4,ExpCTR)
+				sheet.write(row,5,ComPV)
+				sheet.write(row,6,ComClick)
+				sheet.write(row,7,ComCost)
+				sheet.write(row,8,ComCTR)
+				sheet.write(row,9,CTR_change)
+				sheet.write(row,10,PV_exp_comp)
+				sheet.write(row,11,Cost_exp_comp)
+				row += 1
+			if isWeekornot(day) == True:
+				last7 = last7days(day)
+				WeekExpCTR,WeekComCTR,WeekCTRChange = calcWeekCTR(dic,key,last7)
+				if WeekExpCTR != 0:
+					sheet.write(row,12,u"上周A路CTR",mystyle2)
+					sheet.write(row,13,WeekExpCTR)
+					sheet.write(row,14,u"上周对照组CTR",mystyle2)
+					sheet.write(row,15,WeekComCTR)
+					sheet.write(row,16,u"CTR变化",mystyle2)
+					sheet.write(row,17,WeekCTRChange)
+			#else:
+				#print "%s don't have data of %s"%(key,day)
+			##此处可增写备注
+		sheet.write(row,0,u'总计',mystyle2)
+		ExpPV,ExpClick,ExpCost,ExpCTR,ComPV,ComClick,ComCost,ComCTR,CTR_change,PV_exp_comp,Cost_exp_comp = dic[key][u"总计"]
+		sheet.write(row,1,ExpPV,mystyle2)
+		sheet.write(row,2,ExpClick,mystyle2)
+		sheet.write(row,3,ExpCost,mystyle2)
+		sheet.write(row,4,ExpCTR,mystyle2)
+		sheet.write(row,5,ComPV,mystyle2)
+		sheet.write(row,6,ComClick,mystyle2)
+		sheet.write(row,7,ComCost,mystyle2)
+		sheet.write(row,8,ComCTR,mystyle2)
+		sheet.write(row,9,CTR_change,mystyle2)
+		sheet.write(row,10,PV_exp_comp,mystyle2)
+		sheet.write(row,11,Cost_exp_comp,mystyle2)
+		row += 2
+	print "the second sheet is write"
+
+def isWeekornot(weekdate):
+	superstartdate = "20160620"
+	format = "%Y%m%d"
+	sd = datetime.datetime.strptime(superstartdate,format)
+	ed = datetime.datetime.strptime(weekdate,format)
+	delta = ed-sd
+	if (delta.days+1)%7 == 0:
+		return True
+	else:
+		return False
+
+def last7days(weekdate):
+	format = "%Y%m%d"
+	ed = datetime.datetime.strptime(weekdate,format)
+	sd = ed - datetime.timedelta(days = 6)
+	sd = datetime.datetime.strftime(sd,format)
+	ts = timeseries(sd,weekdate)
+	
+	return ts
+
+def calcWeekCTR(dic,key,ts):
+	ExpPV = 0
+	ExpClick = 0
+	ComPV = 0
+	ComClick = 0
+	for day in ts:
+		if dic[key].has_key(day):
+			ExpPV += dic[key][day][0]
+			ExpClick += dic[key][day][1]
+			ComPV += dic[key][day][4]
+			ComClick += dic[key][day][5]
+	if ExpPV == 0:
+		return 0,0,0
+	else:
+		return float(ExpClick)/ExpPV,float(ComClick)/ComPV,(float(ExpClick)/ExpPV)/(float(ComClick)/ComPV)-1
