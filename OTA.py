@@ -45,6 +45,12 @@ def repair_line_6(line):
 		QueryWord,Style_ID = split_question(Y)
 		return PV_ID,Account_ID,KeyWord,QueryWord,Style_ID,Click,Cost
 
+def repair_line_9(line):
+	a1,b2,c3,d4,e5,f6,h8,i9,j10 = line.split('\t')
+	f6,g7 = split_question(f6)
+	return [a1,b2,c3,d4,e5,f6,int(g7),int(h8),int(i9),j10]
+
+		
 def check_number(s):
 	try:
 		return int(s)
@@ -334,7 +340,7 @@ def timeseries(startdate,enddate):
 def loadandmerge(a,startdate,enddate):
 	AllData = {}
 	Stylekey = ''
-	AllStyle = [u"酒店",u"旅游",u"机票",u"酒店-单体品牌词",u"酒店-通用词",u"酒店-地域酒店",u"酒店-连锁品牌词",u"旅游-通用词",u"旅游-单线路",u"机票通用词",u"机票-交通出行聚合"]
+	AllStyle = [u"酒店",u"旅游",u"机票",u"酒店-单体品牌词",u"酒店-通用词",u"酒店-地域酒店",u"酒店-连锁品牌词",u"旅游-通用词",u"旅游-单线路",u"机票通用词",u"机票-交通出行聚合",u"总计"]
 	data = xlrd.open_workbook(a)
 	table = data.sheets()[1]
 	for i in range(table.nrows):
@@ -343,7 +349,7 @@ def loadandmerge(a,startdate,enddate):
 			Stylekey = line[0]
 			AllData[Stylekey]={}
 			continue
-		if line[0] ==u"总计" or line[0] == '':
+		if line[0] ==u"总计" or line[0] ==u'' or line[0] == '':
 			continue
 		AllData[Stylekey][line[0]] = line[1:]
 	for k in timeseries(startdate,enddate):
@@ -434,7 +440,7 @@ def loadoneday(date):
 	return dic
 	
 
-def writeall(dic,startdate,enddate):
+def writeall(dic,startdate,enddate,savename):
 	#AllStyle = [u"酒店",u"旅游",u"机票",u"酒店-单体品牌词",u"酒店-通用词",u"酒店-地域酒店",u"酒店-连锁品牌词",u"旅游-通用词",u"旅游-单线路",u"机票通用词",u"机票-交通出行聚合"]
 	workbook = pyExcelerator.Workbook()
 	sheet1 = workbook.add_sheet(u'结论')
@@ -443,7 +449,7 @@ def writeall(dic,startdate,enddate):
 	writefirst(sheet1,dic,startdate,enddate)
 	writesecond(sheet2,dic,startdate,enddate)
 	
-	workbook.save("resulttest.xls")
+	workbook.save(savename)
 	
 	print "all is write into the EXCEL"
 	
