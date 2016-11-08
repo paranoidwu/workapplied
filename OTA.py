@@ -143,7 +143,11 @@ def calculate_result(dic):
 		
 		result[key].append(float(result[key][1])/result[key][0])
 		result[key].append(float(result[key][4])/result[key][3])
-		result[key].append(result[key][6]/result[key][7]-1)
+		################################################################修改
+		if result[key][7] == 0:
+			result[key].append(0.01)
+		else:
+			result[key].append(result[key][6]/result[key][7]-1)
 		
 		#汇总酒店
 		if key == "11" or key == "12"or key == "13"or key == "14":
@@ -172,23 +176,36 @@ def calculate_result(dic):
 
 	ExpCTR =float(ExpClick) / ExpPV
 	ComCTR =float(ComClick) / ComPV
-	CTR_change =ExpCTR / ComCTR - 1
+	if ComCTR == 0:
+		CTR_change = 0.01
+	else:
+		CTR_change =ExpCTR / ComCTR - 1
 	result['99'] = [ExpPV,ExpClick,ExpCost,ComPV,ComClick,ComCost,ExpCTR,ComCTR,CTR_change]
-	
-	Hotel_ExpCTR =float(Hotel_ExpClick) / Hotel_ExpPV
-	Hotel_ComCTR =float(Hotel_ComClick) / Hotel_ComPV
-	Hotel_CTR_change =Hotel_ExpCTR / Hotel_ComCTR - 1
+	if float(Hotel_ExpClick) == 0 or float(Hotel_ComClick) == 0:
+		Hotel_ExpCTR = 0
+		Hotel_ComCTR = 0
+		Hotel_CTR_change = 0.01
+	else:
+		Hotel_ExpCTR =float(Hotel_ExpClick) / Hotel_ExpPV
+		Hotel_ComCTR =float(Hotel_ComClick) / Hotel_ComPV
+		Hotel_CTR_change =Hotel_ExpCTR / Hotel_ComCTR - 1
 	result['97'] = [Hotel_ExpPV,Hotel_ExpClick,Hotel_ExpCost,Hotel_ComPV,Hotel_ComClick,Hotel_ComCost,Hotel_ExpCTR,Hotel_ComCTR,Hotel_CTR_change]
 	
 	Travel_ExpCTR =float(Travel_ExpClick) / Travel_ExpPV
 	Travel_ComCTR =float(Travel_ComClick) / Travel_ComPV
-	Travel_CTR_change =Travel_ExpCTR / Travel_ComCTR - 1
+	if Travel_ComCTR == 0:
+		Travel_CTR_change = 0.01
+	else:
+		Travel_CTR_change =Travel_ExpCTR / Travel_ComCTR - 1
 	result['98'] = [Travel_ExpPV,Travel_ExpClick,Travel_ExpCost,Travel_ComPV,Travel_ComClick,Travel_ComCost,Travel_ExpCTR,Travel_ComCTR,Travel_CTR_change]
 	
 	if Ticket_ExpPV != 0 and Ticket_ComPV != 0:
 		Ticket_ExpCTR =float(Ticket_ExpClick) / Ticket_ExpPV
 		Ticket_ComCTR =float(Ticket_ComClick) / Ticket_ComPV
-		Ticket_CTR_change =Ticket_ExpCTR / Ticket_ComCTR - 1
+		if Ticket_ComCTR == 0:
+			Ticket_CTR_change = 0.01
+		else:
+			Ticket_CTR_change =Ticket_ExpCTR / Ticket_ComCTR - 1
 		result['96'] = [Ticket_ExpPV,Ticket_ExpClick,Ticket_ExpCost,Ticket_ComPV,Ticket_ComClick,Ticket_ComCost,Ticket_ExpCTR,Ticket_ComCTR,Ticket_CTR_change]
 	
 	return result
@@ -313,17 +330,20 @@ def write_result(a,sheet,b,shunxu):
 	sheet.write(row,9,'CTR_change')
 	
 	for key in shunxu:
-		row += 1
-		sheet.write(row,0,b[shunxu[key]])
-		sheet.write(row,1,a[shunxu[key]][0])
-		sheet.write(row,2,a[shunxu[key]][1])
-		sheet.write(row,3,a[shunxu[key]][2])
-		sheet.write(row,4,a[shunxu[key]][6])
-		sheet.write(row,5,a[shunxu[key]][3])
-		sheet.write(row,6,a[shunxu[key]][4])
-		sheet.write(row,7,a[shunxu[key]][5])
-		sheet.write(row,8,a[shunxu[key]][7])
-		sheet.write(row,9,a[shunxu[key]][8])
+		if a.has_key(shunxu[key]):
+			row += 1
+			sheet.write(row,0,b[shunxu[key]])
+			sheet.write(row,1,a[shunxu[key]][0])
+			sheet.write(row,2,a[shunxu[key]][1])
+			sheet.write(row,3,a[shunxu[key]][2])
+			sheet.write(row,4,a[shunxu[key]][6])
+			sheet.write(row,5,a[shunxu[key]][3])
+			sheet.write(row,6,a[shunxu[key]][4])
+			sheet.write(row,7,a[shunxu[key]][5])
+			sheet.write(row,8,a[shunxu[key]][7])
+			sheet.write(row,9,a[shunxu[key]][8])
+		else:
+			print "Dic doesn's has key %r"%shunxu[key]
 	
 	print "ALL is successfully done"
 
@@ -355,9 +375,17 @@ def loadandmerge(a,startdate,enddate):
 	for k in timeseries(startdate,enddate):
 		oneday = loadoneday(k)
 		for key in oneday:
-			AllData[key][k] = oneday[key]
-			PV_exp_comp = float(AllData[key][k][0])/AllData[key][k][4]
-			Cost_exp_comp = float(AllData[key][k][2])/AllData[key][k][6]
+			if AllData.has_key(key):
+				AllData[key][k] = oneday[key]
+			else:
+				print "doont has key",key
+			########################修改
+			if AllData[key][k][4] == 0 or AllData[key][k][6] == 0:
+				PV_exp_comp = 0.01
+				Cost_exp_comp = 0.01
+			else:
+				PV_exp_comp = float(AllData[key][k][0])/AllData[key][k][4]
+				Cost_exp_comp = float(AllData[key][k][2])/AllData[key][k][6]
 			AllData[key][k].append(PV_exp_comp)
 			AllData[key][k].append(Cost_exp_comp)
 	#读取所有数据，开始增加所有样式的分天总计项，不能带“机票”、"旅游"、“酒店”，否则重复
@@ -387,10 +415,16 @@ def loadandmerge(a,startdate,enddate):
 			continue
 		else:
 			ExpCTR1 = float(ExpClick1)/ExpPV1
-			ComCTR1 = float(ComClick1)/ComPV1
-			CTR_change1 = ExpCTR1/ComCTR1-1
-			PV_exp_comp1 = float(ExpPV1) / ComPV1
-			Cost_exp_comp1 = float(ExpCost1) / ComCost1
+			if ComClick1 == 0:
+				ComCTR1 = 0.01
+				CTR_change1 = 0.01
+				PV_exp_comp1 = 0.01
+				Cost_exp_comp1 = 0.01
+			else:
+				ComCTR1 = float(ComClick1)/ComPV1
+				CTR_change1 = ExpCTR1/ComCTR1-1
+				PV_exp_comp1 = float(ExpPV1) / ComPV1
+				Cost_exp_comp1 = float(ExpCost1) / ComCost1
 		#print "%s data is"%k,ExpPV1,ExpClick1,ExpCost1,ExpCTR1,ComPV1,ComClick1,ComCost1,ComCTR1,CTR_change1,PV_exp_comp1,Cost_exp_comp1
 		AllData[u"总计"][k]=[ExpPV1,ExpClick1,ExpCost1,ExpCTR1,ComPV1,ComClick1,ComCost1,ComCTR1,CTR_change1,PV_exp_comp1,Cost_exp_comp1]
 	#增加分样式总计：
@@ -418,10 +452,16 @@ def loadandmerge(a,startdate,enddate):
 			continue
 		else:
 			ExpCTR2 = float(ExpClick2)/ExpPV2
-			ComCTR2 = float(ComClick2)/ComPV2
-			CTR_change2 = ExpCTR2/ComCTR2-1
-			PV_exp_comp2 = float(ExpPV2) / ComPV2
-			Cost_exp_comp2 = float(ExpCost2) / ComCost2
+			if ComClick2 == 0:
+				ComCTR2 = 0.01
+				CTR_change2 = 0.01
+				PV_exp_comp2 = 0.01
+				Cost_exp_comp2 = 0.01
+			else:
+				ComCTR2 = float(ComClick2)/ComPV2
+				CTR_change2 = ExpCTR2/ComCTR2-1
+				PV_exp_comp2 = float(ExpPV2) / ComPV2
+				Cost_exp_comp2 = float(ExpCost2) / ComCost2
 		AllData[key][u"总计"]=[ExpPV2,ExpClick2,ExpCost2,ExpCTR2,ComPV2,ComClick2,ComCost2,ComCTR2,CTR_change2,PV_exp_comp2,Cost_exp_comp2]
 	return AllData
 	
@@ -698,3 +738,39 @@ def calcWeekCTR(dic,key,ts):
 		return 0,0,0
 	else:
 		return float(ExpClick)/ExpPV,float(ComClick)/ComPV,(float(ExpClick)/ExpPV)/(float(ComClick)/ComPV)-1
+		
+
+def write_on_3(dic,savename):
+	workbook = pyExcelerator.Workbook()
+	sheet1 = workbook.add_sheet('origin_empty')
+	sheet2 = workbook.add_sheet('QuerySum_empty')
+	sheet3 = workbook.add_sheet('ValidData_empty')
+	sheet4 = workbook.add_sheet('result')
+	row = 0
+	sheet1.write(row,0,'Just to fill blank,please read sheet4')
+	sheet2.write(row,0,'Just to fill blank,please read sheet4')
+	sheet3.write(row,0,'Just to fill blank,please read sheet4')
+	sheet4.write(row,0,'Style')
+	sheet4.write(row,1,'ExpPV')
+	sheet4.write(row,2,'ExpClick')
+	sheet4.write(row,3,'ExpCost')
+	sheet4.write(row,4,'ExpCTR')
+	sheet4.write(row,5,'ComPV')
+	sheet4.write(row,6,'ComClick')
+	sheet4.write(row,7,'ComCost')
+	sheet4.write(row,8,'ComCTR')
+	sheet4.write(row,9,'CTR_change')
+	
+	for key in dic:
+		row += 1
+		sheet4.write(row,0,key.decode('gbk', "ignore"))
+		sheet4.write(row,1,dic[key][0])
+		sheet4.write(row,2,dic[key][1])
+		sheet4.write(row,3,dic[key][2])
+		sheet4.write(row,4,dic[key][3])
+		sheet4.write(row,5,dic[key][4])
+		sheet4.write(row,6,dic[key][5])
+		sheet4.write(row,7,dic[key][6])
+		sheet4.write(row,8,dic[key][7])
+		sheet4.write(row,9,dic[key][8])
+	workbook.save(savename)
