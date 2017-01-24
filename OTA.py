@@ -357,6 +357,16 @@ def timeseries(startdate,enddate):
 		ts.append(datetime.datetime.strftime(sd+datetime.timedelta(days = i),format))
 	return ts
 
+def timeseries7back(startdate,enddate):
+	format = "%Y%m%d"
+	sd = datetime.datetime.strptime(startdate,format)
+	ed = datetime.datetime.strptime(enddate,format)
+	delta = ed-sd
+	ts = []
+	for i in range(delta.days+1):
+		ts.append(datetime.datetime.strftime(sd+datetime.timedelta(days = i-7),format))
+	return ts
+	
 def loadandmerge(a,startdate,enddate):
 	AllData = {}
 	Stylekey = ''
@@ -774,3 +784,26 @@ def write_on_3(dic,savename):
 		sheet4.write(row,8,dic[key][7])
 		sheet4.write(row,9,dic[key][8])
 	workbook.save(savename)
+
+def CumulateWords(startdate,enddate):
+	ts = timeseries(startdate,enddate)
+	dic = {}
+	for d in ts:
+		filename_with_date = "C:\\Users\\wuenyu\\save\\OTA\\"+d+"\\"+d+"\\galaxy_ota_stat_not_triggered_reason_"+d
+		fin = open(filename_with_date,'r')
+		mark = 0
+		for line in fin:
+			mark += 1
+			line = line.strip().split('\t')
+			if len(line) != 4:
+				print d,mark
+				continue
+			if dic.has_key(line[0]):
+				if dic[line[0]].has_key(line[2]):
+					dic[line[0]][line[2]] += int(line[3])
+				else:
+					dic[line[0]][line[2]] = int(line[3])
+			else:
+				dic[line[0]] = {}
+				dic[line[0]][line[2]] = int(line[3])
+	return dic
